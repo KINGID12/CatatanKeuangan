@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Catatan Keuangan Harian</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --bg: #f5f7fa;
+      --primary: #4a90e2;
+      --income: #4caf50;
+      --expense: #f44336;
+      --text: #333;
+      --card-bg: #ffffff;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', sans-serif;
+      background: linear-gradient(to right, #dbe6f6, #ffffff);
+      color: var(--text);
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 30px auto;
+      padding: 20px;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border-radius: 12px;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.1);
+      padding: 25px;
+      margin-bottom: 25px;
+      animation: fadeSlide 0.7s ease;
+    }
+
+    @keyframes fadeSlide {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    h1 {
+      text-align: center;
+      color: var(--primary);
+      margin-bottom: 20px;
+    }
+
+    form {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 15px;
+    }
+
+    input, select, button {
+      flex: 1 1 180px;
+      padding: 12px;
+      font-size: 1em;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      transition: all 0.3s ease;
+    }
+
+    input:focus, select:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 5px rgba(74,144,226,0.4);
+    }
+
+    button {
+      background: var(--primary);
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #3f7ecb;
+    }
+
+    .summary {
+      text-align: center;
+      font-size: 1.1em;
+    }
+
+    .summary p {
+      margin: 5px 0;
+    }
+
+    .income {
+      color: var(--income);
+    }
+
+    .expense {
+      color: var(--expense);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+      font-size: 0.95em;
+    }
+
+    th, td {
+      padding: 12px;
+      border: 1px solid #ddd;
+      text-align: center;
+    }
+
+    th {
+      background: var(--primary);
+      color: white;
+    }
+
+    .chart-container {
+      width: 100%;
+      max-width: 400px;
+      margin: 30px auto 0;
+    }
+
+    @media (max-width: 600px) {
+      form {
+        flex-direction: column;
+      }
+
+      table, thead, tbody, th, td, tr {
+        font-size: 0.85em;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="card">
+      <h1>📘 Catatan Keuangan Harian</h1>
+      <form id="form">
+        <input type="date" id="tanggal" required />
+        <input type="text" id="deskripsi" placeholder="Deskripsi" required />
+        <input type="number" id="jumlah" placeholder="Jumlah (Rp)" required />
+        <select id="tipe">
+          <option value="pemasukan">Pemasukan</option>
+          <option value="pengeluaran">Pengeluaran</option>
+        </select>
+        <button type="submit">Tambah</button>
+      </form>
+    </div>
+
+    <div class="card summary">
+      <p>💰 Saldo: <strong id="saldo">Rp 0</strong></p>
+      <p class="income">📈 Total Pemasukan: <strong id="totalPemasukan">Rp 0</strong></p>
+      <p class="expense">📉 Total Pengeluaran: <strong id="totalPengeluaran">Rp 0</strong></p>
+    </div>
+
+    <div class="card">
+      <table>
+        <thead>
+          <tr>
+            <th>Tanggal & Jam</th>
+            <th>Deskripsi</th>
+            <th>Jumlah</th>
+            <th>Tipe</th>
+          </tr>
+        </thead>
+        <tbody id="transaksiList"></tbody>
+      </table>
+    </div>
+
+    <div class="card chart-container">
+      <canvas id="pieChart"></canvas>
+    </div>
+  </div>
+
+  <script>
+    const form = document.getElementById('form');
+    const tanggal = document.getElementById('tanggal');
+    const deskripsi = document.getElementById('deskripsi');
+    const jumlah = document.getElementById('jumlah');
+    const tipe = document.getElementById('tipe');
+    const transaksiList = document.getElementById('transaksiList');
+    const saldoEl = document.getElementById('saldo');
+    const totalPemasukanEl = document.getElementById('totalPemasukan');
+    const totalPengeluaranEl = document.getElementById('totalPengeluaran');
+    const pieChartCanvas = document.getElementById('pieChart');
+
+    let transaksi = [];
+
+    const pieChart = new Chart(pieChartCanvas, {
+      type: 'pie',
+      data: {
+        labels: ['Pemasukan', 'Pengeluaran'],
+        datasets: [{
+          data: [0, 0],
+          backgroundColor: ['#4caf50', '#f44336'],
+          hoverOffset: 10
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: {
+            position: 'bottom'
+          }
+        }
+      }
+    });
+
+    form.addEventListener('submit', function(e) {
+      e.preventDefault();
+
+      const now = new Date();
+      const jam = now.toLocaleTimeString('id-ID'); // jam:menit:detik
+
+      const newTransaksi = {
+        tanggal: tanggal.value + ' ' + jam,
+        deskripsi: deskripsi.value,
+        jumlah: Number(jumlah.value),
+        tipe: tipe.value
+      };
+
+      transaksi.push(newTransaksi);
+
+      // Reset form
+      tanggal.value = '';
+      deskripsi.value = '';
+      jumlah.value = '';
+
+      renderTransaksi();
+    });
+
+    function renderTransaksi() {
+      transaksiList.innerHTML = '';
+      let totalPemasukan = 0;
+      let totalPengeluaran = 0;
+
+      transaksi.forEach(item => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>${item.tanggal}</td>
+          <td>${item.deskripsi}</td>
+          <td>Rp ${item.jumlah.toLocaleString('id-ID')}</td>
+          <td class="${item.tipe === 'pemasukan' ? 'income' : 'expense'}">${item.tipe}</td>
+        `;
+        transaksiList.appendChild(row);
+
+        if (item.tipe === 'pemasukan') {
+          totalPemasukan += item.jumlah;
+        } else {
+          totalPengeluaran += item.jumlah;
+        }
+      });
+
+      const saldo = totalPemasukan - totalPengeluaran;
+      saldoEl.textContent = `Rp ${saldo.toLocaleString('id-ID')}`;
+      totalPemasukanEl.textContent = `Rp ${totalPemasukan.toLocaleString('id-ID')}`;
+      totalPengeluaranEl.textContent = `Rp ${totalPengeluaran.toLocaleString('id-ID')}`;
+
+      // Update chart
+      pieChart.data.datasets[0].data = [totalPemasukan, totalPengeluaran];
+      pieChart.update();
+    }
+  </script>
+</body>
+</html>
