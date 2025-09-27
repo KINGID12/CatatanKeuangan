@@ -1,10 +1,10 @@
-<!DOCTYPE html>
 <html lang="id">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Catatan Keuangan Harian</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
   <style>
     :root {
       --bg: #f5f7fa;
@@ -126,14 +126,18 @@
       margin: 30px auto 0;
     }
 
-    @media (max-width: 600px) {
-      form {
-        flex-direction: column;
-      }
+    .export-btn {
+      background-color: #4caf50;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      margin-top: 10px;
+      border-radius: 8px;
+      cursor: pointer;
+    }
 
-      table, thead, tbody, th, td, tr {
-        font-size: 0.85em;
-      }
+    .export-btn:hover {
+      background-color: #3e8e41;
     }
 
     .hapus-btn {
@@ -147,6 +151,16 @@
 
     .hapus-btn:hover {
       background-color: #d32f2f;
+    }
+
+    @media (max-width: 600px) {
+      form {
+        flex-direction: column;
+      }
+
+      table, thead, tbody, th, td, tr {
+        font-size: 0.85em;
+      }
     }
   </style>
 </head>
@@ -173,6 +187,7 @@
     </div>
 
     <div class="card">
+      <button class="export-btn" onclick="exportToExcel()">📥 Ekspor ke Excel</button>
       <table>
         <thead>
           <tr>
@@ -254,7 +269,6 @@
 
       transaksi.push(newTransaksi);
 
-      // Reset form
       tanggal.value = '';
       deskripsi.value = '';
       jumlah.value = '';
@@ -291,19 +305,36 @@
       totalPengeluaranEl.textContent = `Rp ${totalPengeluaran.toLocaleString('id-ID')}`;
 
       pieChart.data.datasets[0].data = [totalPemasukan, totalPengeluaran];
-      pieChart.data.datasets[0].data = [totalPemasukan, totalPengeluaran];
       pieChart.update();
 
-      // Simpan ke localStorage
       localStorage.setItem('transaksiData', JSON.stringify(transaksi));
     }
 
-    // Fungsi untuk menghapus transaksi berdasarkan index
     function hapusTransaksi(index) {
-      transaksi.splice(index, 1); // Hapus 1 item pada posisi index
-      renderTransaksi(); // Render ulang tampilan dan simpan lagi
+      transaksi.splice(index, 1);
+      renderTransaksi();
+    }
+
+    function exportToExcel() {
+      const data = [
+        ["Tanggal & Jam", "Deskripsi", "Jumlah", "Tipe"]
+      ];
+
+      transaksi.forEach(item => {
+        data.push([
+          item.tanggal,
+          item.deskripsi,
+          item.jumlah,
+          item.tipe
+        ]);
+      });
+
+      const worksheet = XLSX.utils.aoa_to_sheet(data);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Transaksi");
+
+      XLSX.writeFile(workbook, "catatan_keuangan.xlsx");
     }
   </script>
 </body>
 </html>
-
